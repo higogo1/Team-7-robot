@@ -90,12 +90,35 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 cd robot
 python3 -m venv --system-site-packages venv && source venv/bin/activate
 pip install -r requirements.txt
+python download_models.py      # 얼굴 인식 모델 받기 (최초 1회)
 python main.py
 ```
-`config.py`의 `SERVER_URL`을 노트북 IP로 바꾸세요. 노트북 IP는 `ipconfig`로 확인합니다.
+- `config.py`의 `SERVER_URL`을 노트북 IP로 바꾸세요. 노트북 IP는 `ipconfig`로 확인합니다.
+- Yahboom 자료의 `Raspbot_Lib.py`를 `robot/` 폴더에 복사하세요. 이 파일이 없으면 **가짜 하드웨어 모드**로 돌아서 노트북에서도 실행할 수 있습니다.
+- 처음에는 `config.py`의 `LINE_ACTIVE_LOW`, `MOTOR_SIGN`부터 확인하세요. 라인 위에서 센서 값이 반대로 나오거나 바퀴가 거꾸로 돌면 이 두 값을 바꿉니다.
 
 ### XIAO 노드
 Arduino IDE에서 `xiao_node.ino`를 열고 Wi-Fi 정보, 서버 IP, `NODE_ID`를 수정한 뒤 업로드합니다.
+시리얼 모니터에 1초마다 `level=` 값이 찍힙니다. 이 값을 보고 `SOUND_THRESHOLD`를 맞추세요. 시연할 때는 **BOOT 버튼**을 눌러 이벤트를 강제로 발생시킬 수 있습니다.
+
+## 시연 순서
+
+1. 노트북에서 서버 실행 → 대시보드 접속 → **🔔 알림 켜기** 클릭
+2. XIAO 노드 4개 전원 ON → 대시보드 A~D가 "노드 온라인"인지 확인
+3. 로봇을 D와 A 사이 출발점에 두고 `python main.py` → **📍 위치 초기화** → **▶ 순찰 시작**
+4. 노드 근처에서 박수 또는 BOOT 버튼 → 웹 알림과 사진 표시 → 로봇이 해당 지점으로 출동
+5. 카메라 앞에서 **📸 특정인 등록**(2~3번 누르면 인식이 더 안정적) → **👤 사람 따라가기**
+6. 추종 후에는 위치를 잃습니다. 로봇을 출발점에 다시 두고 위치 초기화
+
+## 서버 API
+
+| 경로 | 보내는 쪽 | 내용 |
+|---|---|---|
+| `POST /api/event?node=A&type=sound&level=N` | XIAO | 본문은 JPEG. 웹 알림 후 로봇 자동 출동 (같은 노드는 10초 쿨다운) |
+| `POST /api/heartbeat?node=A` | XIAO | 10초마다 보내는 생존 신호 |
+| `POST /api/command` | 웹 | `{"cmd": "patrol" \| "follow" \| "stop" \| "register" \| "reset_pos"}`, `{"cmd": "dispatch", "node": "B"}` |
+| `WS /ws/robot` | 로봇 | 명령 수신, 상태와 알림 보고 |
+| `WS /ws/web` | 웹 | 이벤트, 알림, 로봇 상태 실시간 수신 |
 
 ## 협업 규칙
 
