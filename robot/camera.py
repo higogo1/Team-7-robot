@@ -16,12 +16,15 @@ import config
 class Camera:
     def __init__(self):
         self.cap = cv2.VideoCapture(config.CAMERA_INDEX)
+        # MJPG로 고정: 지정 안 하면 무압축(YUYV)으로 열려 1280x720에서 10fps로 떨어짐
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_W)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_H)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not self.cap.isOpened():
             print("[camera] 카메라를 열 수 없음 — CAMERA_INDEX 확인 (ls /dev/video*)")
         self._frame = None
+        self._frame_t = time.time()  # 마지막으로 새 화면이 들어온 시각 (기기 이상 감시용)
         self._overlay = None      # 비전 결과를 그린 프레임 (있으면 스트림에 이걸 보냄)
         self._overlay_t = 0.0
         self._jpeg = None
@@ -36,6 +39,11 @@ class Camera:
                 continue
             with self._lock:
                 self._frame = frame
+                self._frame_t = time.time()
+
+    def frame_age(self):
+        """마지막 새 화면 이후 지난 시간(초)"""
+        return time.time() - self._frame_t
 
     def read(self):
         """최신 프레임 반환 (없으면 None)"""
@@ -48,12 +56,14 @@ class Camera:
             self._overlay = frame
             self._overlay_t = time.time()
 
-    def _stream_frame(self):
+    def _stream_frame(self, max_w=None):
         with self._lock:
             use_overlay = self._overlay is not None and time.time() - self._overlay_t < 0.5
             frame = self._overlay if use_overlay else self._frame
         if frame is None:
             return None
+        if max_w and frame.shape[1] > max_w:  # 웹 스트림은 작게 (와이파이 부담 줄이기)
+            frame = cv2.resize(frame, (max_w, frame.shape[0] * max_w // frame.shape[1]))
         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         return buf.tobytes() if ok else None
 
@@ -88,7 +98,7 @@ class Camera:
                 self.end_headers()
                 try:
                     while True:
-                        jpg = cam._stream_frame()
+                        jpg = cam._stream_frame(max_w=config.STREAM_W)
                         if jpg is not None:
                             self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\n"
                                              + f"Content-Length: {len(jpg)}\r\n\r\n".encode()

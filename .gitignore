@@ -4,5 +4,4 @@ venv/
 .venv/
 server/snapshots/
 robot/models/*.onnx
-robot/target.npy
 robot/Raspbot_Lib.py

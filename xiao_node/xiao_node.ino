@@ -1,4 +1,4 @@
-// XIAO ESP32S3 Sense 감시 노드 — 담당: 센서 노드
+// XIAO ESP32S3 Sense 감지 센서 — 담당: 센서 노드
 // 큰 소리(마이크) 또는 BOOT 버튼 → 사진 촬영 → 관제 서버로 이벤트 전송
 //
 // Arduino IDE 설정
@@ -6,7 +6,7 @@
 //   Tools > PSRAM: "OPI PSRAM"   ← 카메라 쓰려면 필수
 //   안테나 꼭 연결!
 //
-// 팀원마다 NODE_ID 만 바꿔서 업로드 (A, B, C, D)
+// 센서마다 SENSOR_ID 만 다르게 해서 업로드 (영문·숫자 16자 이내, 예: S1, S2, DOOR)
 //
 // 소리 기준값 맞추기
 //   시리얼 모니터(115200)를 열면 1초마다 "level=숫자" 가 찍힌다.
@@ -20,7 +20,7 @@
 const char* WIFI_SSID = "YOUR_WIFI";          // 2.4GHz 와이파이만 됨
 const char* WIFI_PASS = "YOUR_PASSWORD";
 const char* SERVER    = "http://192.168.0.10:8000";  // 노트북 IP
-const char* NODE_ID   = "A";
+const char* SENSOR_ID = "S1";
 
 const int  SOUND_THRESHOLD   = 3000;   // 이 값 넘으면 이벤트 (현장에서 튜닝)
 const unsigned long COOLDOWN_MS  = 10000;  // 이벤트 후 재감지 금지 시간
@@ -118,7 +118,7 @@ void sendEvent(const char* type, int level) {
     if (!fb) Serial.println("사진 촬영 실패 — 사진 없이 전송");
   }
 
-  String url = String(SERVER) + "/api/event?node=" + NODE_ID + "&type=" + type + "&level=" + level;
+  String url = String(SERVER) + "/api/event?sensor=" + SENSOR_ID + "&type=" + type + "&level=" + level;
   HTTPClient http;
   http.begin(url);
   http.setTimeout(5000);
@@ -132,7 +132,7 @@ void sendEvent(const char* type, int level) {
 void sendHeartbeat(int level) {
   if (WiFi.status() != WL_CONNECTED) { connectWiFi(); return; }
   HTTPClient http;
-  http.begin(String(SERVER) + "/api/heartbeat?node=" + NODE_ID + "&level=" + level);
+  http.begin(String(SERVER) + "/api/heartbeat?sensor=" + SENSOR_ID + "&level=" + level);
   http.setTimeout(2000);
   int code = http.POST((uint8_t*)nullptr, 0);
   if (code != 200) Serial.printf("heartbeat 실패 HTTP %d (서버 IP/방화벽 확인)\n", code);
@@ -142,7 +142,7 @@ void sendHeartbeat(int level) {
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.printf("\n=== 감시 노드 %s ===\n", NODE_ID);
+  Serial.printf("\n=== 감지 센서 %s ===\n", SENSOR_ID);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);

@@ -9,6 +9,8 @@ Yahboom 자료의 Raspbot_Lib.py 를 이 폴더(robot/)에 복사해서 사용.
   초음파 Ctrl_Ulatist_Switch(1) 후 0x1b(상위), 0x1a(하위) → mm
   서보  Ctrl_Servo(1, 좌우 0~180), Ctrl_Servo(2, 상하 0~110)
 """
+import time
+
 import config
 
 try:
@@ -31,9 +33,15 @@ class Hardware:
             self.bot = Raspbot()
             self.bot.Ctrl_Ulatist_Switch(1)
         self._last = None
+        self.last_cmd = (0.0, 0.0, 0.0)  # 마지막 주행 명령 (vx, vy, wz) — 대시보드 작동 표시용
+        self.cmd_t = 0.0                 # 주행 명령이 마지막으로 바뀐 시각 (기기 이상 감시용)
+        self.io_error = False            # 마지막 센서 읽기에서 보드와 통신 오류가 났는지 (기기 이상 감시용)
 
     def drive(self, vx, vy=0.0, wz=0.0):
         """메카넘 주행. vx: 전진+, vy: 왼쪽 이동+, wz: 좌회전+  (단위: 모터 값, 대략 -255~255)"""
+        if (vx, vy, wz) != self.last_cmd:
+            self.cmd_t = time.time()
+        self.last_cmd = (vx, vy, wz)
         speeds = [
             vx - vy - wz,  # 왼앞
             vx + vy - wz,  # 왼뒤
@@ -62,16 +70,18 @@ class Hardware:
         return [(b == 0) if config.LINE_ACTIVE_LOW else (b == 1) for b in bits]
 
     def distance_cm(self):
-        """초음파 거리(cm). 측정 실패 시 None"""
+        """초음파 거리(cm). 반사가 안 돌아오면(앞이 트임) None.
+        보드와 통신 자체가 안 되면 io_error=True (반사 없음과 구분)"""
         if self.fake:
             return 100.0
-        try:
-            hi = self.bot.read_data_array(0x1b, 1)[0]
-            lo = self.bot.read_data_array(0x1a, 1)[0]
-            mm = (hi << 8) | lo
-            return mm / 10.0 if mm > 0 else None
-        except Exception:
+        hi = self.bot.read_data_array(0x1b, 1)   # Raspbot_Lib 은 I2C 오류 시 예외 대신 None 을 돌려줌
+        lo = self.bot.read_data_array(0x1a, 1)
+        if not hi or not lo:
+            self.io_error = True
             return None
+        self.io_error = False
+        mm = (hi[0] << 8) | lo[0]
+        return mm / 10.0 if mm > 0 else None
 
     def servo(self, pan, tilt):
         """카메라 짐벌 각도"""
@@ -79,6 +89,18 @@ class Hardware:
             return
         self.bot.Ctrl_Servo(1, int(_clamp(pan, 0, 180)))
         self.bot.Ctrl_Servo(2, int(_clamp(tilt, 0, 110)))
+
+    def pan(self, angle):
+        """카메라 좌우만 (90: 정면, 클수록 왼쪽)"""
+        if self.fake:
+            return
+        self.bot.Ctrl_Servo(1, int(_clamp(angle, 0, 180)))
+
+    def tilt(self, angle):
+        """카메라 상하만 (0: 바닥 쪽, 클수록 위)"""
+        if self.fake:
+            return
+        self.bot.Ctrl_Servo(2, int(_clamp(angle, 0, 110)))
 
     def close(self):
         self.stop()
