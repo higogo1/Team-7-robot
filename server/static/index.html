@@ -3,229 +3,503 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>순찰로봇 관제</title>
+<title>T7 Security</title>
 <style>
-  :root { --bg:#0f1218; --card:#181c24; --line:#2a303c; --fg:#e6e9ef; --dim:#8b93a3;
-          --ok:#3fb950; --warn:#f0883e; --bad:#f85149; --accent:#58a6ff; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui, "Malgun Gothic", sans-serif; background:var(--bg); color:var(--fg); }
-  header { display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid var(--line); }
-  header h1 { font-size:18px; margin:0; flex:1; }
-  .pill { font-size:12px; padding:3px 10px; border-radius:99px; background:var(--line); color:var(--dim); }
-  .pill.ok { background:#1d3b25; color:var(--ok); }
-  .pill.bad { background:#3d1d1d; color:var(--bad); }
-  main { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:16px; padding:16px 20px; }
-  @media (max-width:900px) { main { grid-template-columns:1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
-  .card h2 { font-size:14px; margin:0 0 10px; color:var(--dim); font-weight:600; }
-  #streamBox { aspect-ratio:4/3; background:#000; border-radius:8px; display:grid; place-items:center; overflow:hidden; color:var(--dim); }
-  #streamBox img { width:100%; height:100%; object-fit:contain; }
-  .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-  button { font:inherit; font-size:14px; padding:9px 14px; border-radius:8px; border:1px solid var(--line);
-           background:#222836; color:var(--fg); cursor:pointer; }
-  button:hover { border-color:var(--accent); }
-  button.primary { background:#1f3a5f; border-color:#2f5d94; }
-  button.danger { background:#4a1f1f; border-color:#7a2f2f; }
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-  .stat { background:#11151c; border-radius:8px; padding:8px 10px; }
-  .stat b { display:block; font-size:18px; margin-top:2px; }
-  .stat span { font-size:12px; color:var(--dim); }
-  .nodes { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
-  .node { background:#11151c; border:2px solid transparent; border-radius:8px; padding:8px; text-align:center; }
-  .node.here { border-color:var(--accent); }
-  .node.target { border-color:var(--warn); }
-  .node .id { font-size:22px; font-weight:700; }
-  .node .st { font-size:11px; color:var(--dim); }
-  .node .st.on { color:var(--ok); }
-  .node button { margin-top:6px; padding:5px 8px; font-size:12px; width:100%; }
-  #log { list-style:none; margin:0; padding:0; max-height:70vh; overflow:auto; }
-  #log li { border-bottom:1px solid var(--line); padding:8px 2px; font-size:14px; }
-  #log li.event { border-left:3px solid var(--bad); padding-left:8px; }
-  #log li.warn { border-left:3px solid var(--warn); padding-left:8px; }
-  #log time { color:var(--dim); font-size:12px; margin-right:6px; }
-  #log img { display:block; width:100%; max-width:320px; margin-top:6px; border-radius:6px; cursor:zoom-in; }
-  #toast { position:fixed; right:20px; bottom:20px; background:var(--bad); color:#fff; padding:12px 16px;
-           border-radius:8px; font-weight:600; display:none; box-shadow:0 4px 20px #0008; }
+  :root {
+    --bg: #08090a; --panel: #101113; --raised: #16171a; --hover: #1c1d21;
+    --line: #202226; --line2: #2a2c31;
+    --fg: #e8e8ea; --sub: #9b9da4; --mute: #64676e;
+    --accent: #2f7ff5; --ok: #3cb179; --warn: #d9a23a; --bad: #e5484d;
+    --mono: "SF Mono", "JetBrains Mono", "Consolas", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 13px/1.45 "Inter", "Pretendard", system-ui, "Malgun Gothic", sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input { font: inherit; color: inherit; }
+  .mono { font-family: var(--mono); }
+  .cap { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+
+  /* ── 상단 바 ── */
+  .top { position: sticky; top: 0; z-index: 20; height: 44px; display: flex; align-items: center; gap: 18px;
+    padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .top .name { font-weight: 700; letter-spacing: .04em; }
+  .top .sep { width: 1px; height: 18px; background: var(--line2); }
+  .top .title { color: var(--sub); }
+  .grow { flex: 1; }
+  .ind { display: inline-flex; align-items: center; gap: 6px; color: var(--sub); font-size: 12px; white-space: nowrap; }
+  .ind i { width: 6px; height: 6px; border-radius: 50%; background: var(--mute); }
+  .ind.on i { background: var(--ok); } .ind.off i { background: var(--bad); } .ind.off { color: var(--bad); }
+  .level { font-size: 12px; font-weight: 700; letter-spacing: .06em; padding: 3px 8px; border-radius: 3px;
+    border: 1px solid var(--line2); color: var(--ok); }
+  .level.warn { color: var(--warn); border-color: rgba(217,162,58,.45); }
+  .level.bad { color: #fff; background: var(--bad); border-color: var(--bad); }
+  .clock { font-family: var(--mono); color: var(--sub); font-size: 12px; }
+  .field { width: 120px; height: 28px; padding: 0 8px; border-radius: 3px; border: 1px solid var(--line2); background: var(--bg); }
+  .field:focus { outline: none; border-color: var(--accent); }
+  .btn { height: 30px; padding: 0 12px; border-radius: 3px; border: 1px solid var(--line2); background: var(--raised);
+    cursor: pointer; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  .btn:hover { background: var(--hover); border-color: #3a3c42; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn.primary:hover { background: #4890f7; }
+  .btn.danger { color: var(--bad); border-color: rgba(229,72,77,.5); background: transparent; }
+  .btn.danger:hover { background: rgba(229,72,77,.1); }
+  .btn.rec-on { color: #fff; background: var(--bad); border-color: var(--bad); }
+  #ackPill { display: none; }
+
+  /* ── 경보 줄 ── */
+  .bar { display: none; align-items: center; gap: 12px; padding: 8px 16px; font-weight: 600; border-bottom: 1px solid var(--line); }
+  .bar.show { display: flex; }
+  .bar .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: blink 1s steps(2) infinite; }
+  .bar .msg { flex: 1; }
+  #critical { background: var(--bad); color: #fff; }
+  #critical .btn { height: 26px; color: #fff; border-color: rgba(255,255,255,.6); background: transparent; }
+  #alarm { background: #1b0c0d; color: #ff8a8d; border-bottom-color: #3a1517; }
+
+  /* ── 레이아웃 ── */
+  .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: calc(100vh - 44px); }
+  @media (max-width: 1100px) { .wrap { grid-template-columns: 1fr; } .side { border-left: 0; border-top: 1px solid var(--line); } }
+  .stage { padding: 16px; display: grid; gap: 12px; align-content: start; }
+
+  /* ── 영상 ── */
+  .viewer { position: relative; aspect-ratio: 16/9; background: #000; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .viewer img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .viewer .nosig { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); font-family: var(--mono);
+    font-size: 12px; letter-spacing: .12em; }
+  .osd { position: absolute; font-family: var(--mono); font-size: 13px; color: #fff; text-shadow: 0 0 2px #000, 0 1px 2px #000;
+    pointer-events: none; white-space: nowrap; }
+  .osd.tl { left: 14px; top: 12px; } .osd.tr { right: 14px; top: 12px; text-align: right; }
+  .osd.bl { left: 14px; bottom: 12px; } .osd.br { right: 14px; bottom: 12px; text-align: right; }
+  .osd .sm { font-size: 11.5px; opacity: .85; }
+  .osd.rec { left: 50%; top: 12px; transform: translateX(-50%); display: none; color: #fff; background: var(--bad);
+    padding: 2px 8px; border-radius: 2px; text-shadow: none; font-size: 12px; }
+  .osd.rec.show { display: block; }
+  .tag-alarm { display: none; position: absolute; left: 14px; top: 52px; font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: #fff; background: var(--bad); padding: 2px 8px; border-radius: 2px; letter-spacing: .08em; }
+  .cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: .4; pointer-events: none; }
+  .cross::before, .cross::after { content: ""; position: absolute; background: #fff; }
+  .cross::before { left: 50%; top: 0; bottom: 0; width: 1px; } .cross::after { top: 50%; left: 0; right: 0; height: 1px; }
+  body.person .viewer { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+  body.person .tag-alarm { display: block; }
+
+  .toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 4px; }
+  .toolbar .sep { width: 1px; height: 20px; background: var(--line2); margin: 0 6px; }
+
+  /* ── 상태 줄 ── */
+  .info { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+  @media (max-width: 900px) { .info { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .cell { padding: 10px 12px; border-right: 1px solid var(--line); min-width: 0; }
+  .cell:last-child { border-right: 0; }
+  .cell .v { margin-top: 3px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell .v.mono { font-family: var(--mono); font-weight: 500; }
+  .cell.bad .v { color: var(--bad); } .cell.warn .v { color: var(--warn); } .cell.ok .v { color: var(--ok); }
+  .meter { height: 3px; margin-top: 6px; background: var(--line2); }
+  .meter i { display: block; height: 100%; width: 0; background: var(--sub); }
+
+  .phase { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .phase div { padding: 8px 12px; background: var(--panel); color: var(--mute); font-size: 12px; }
+  .phase div b { display: block; color: var(--sub); font-size: 12.5px; font-weight: 600; }
+  .phase div.on { background: #0f1a2b; color: #8fb6f8; box-shadow: inset 0 2px 0 var(--accent); }
+  .phase div.on b { color: #fff; }
+  body.person .phase div.on { background: #200e10; color: #ff9da0; box-shadow: inset 0 2px 0 var(--bad); }
+
+  /* ── 사이드 ── */
+  .side { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0;
+    position: sticky; top: 44px; height: calc(100vh - 44px); }
+  .sec { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .sec-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .tabs { display: flex; gap: 2px; }
+  .tabs button { height: 24px; padding: 0 9px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--sub); cursor: pointer; font-size: 12px; }
+  .tabs button.on { background: var(--raised); border-color: var(--line2); color: var(--fg); }
+  .events { flex: 1; overflow: auto; padding: 0 6px 12px; min-height: 200px; }
+  .ev { display: grid; grid-template-columns: 88px 1fr; gap: 10px; padding: 8px; border-radius: 3px; border-left: 2px solid transparent; }
+  .ev:hover { background: var(--raised); }
+  .ev .thumb { width: 88px; height: 50px; background: #000; border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
+    display: grid; place-items: center; color: var(--mute); font-size: 10px; font-family: var(--mono); letter-spacing: .06em; }
+  .ev .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+  .ev .ttl { font-weight: 600; font-size: 12.5px; }
+  .ev .meta { font-family: var(--mono); font-size: 11px; color: var(--mute); margin-top: 1px; }
+  .ev .msg { color: var(--sub); font-size: 12px; margin-top: 2px; word-break: keep-all; }
+  .ev.k-crit { border-left-color: var(--bad); } .ev.k-crit .ttl { color: var(--bad); }
+  .ev.k-warn { border-left-color: var(--warn); }
+  .ev.k-event { border-left-color: var(--bad); }
+  .ev.k-event.acked { border-left-color: var(--line2); opacity: .7; }
+  .ev.k-photo { border-left-color: var(--accent); }
+  .ev .ackrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--mute); }
+  .ev .ackrow .btn { height: 24px; padding: 0 10px; font-size: 11.5px; }
+  .ev .ackrow .done { color: var(--ok); font-family: var(--mono); }
+  .empty { color: var(--mute); padding: 16px 8px; font-size: 12px; }
+  @media (max-width: 1100px) { .side { position: static; height: auto; } .events { max-height: 60vh; } }
+
+  #toast { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: none; max-width: 420px; padding: 10px 14px;
+    border-radius: 3px; background: var(--raised); border: 1px solid var(--line2); border-left: 3px solid var(--accent); font-size: 12.5px; }
+  #toast.bad { border-left-color: var(--bad); }
+
+  @keyframes blink { 50% { opacity: .25; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>🚓 Team 7 순찰로봇 관제</h1>
-  <span id="srvPill" class="pill">서버 연결 중…</span>
-  <span id="robotPill" class="pill">로봇 오프라인</span>
-  <button id="notifyBtn" style="padding:5px 10px;font-size:12px">🔔 알림 켜기</button>
-</header>
+<div class="top">
+  <span class="name">T7 SECURITY</span><span class="sep"></span><span class="title">순찰로봇 관제</span>
+  <span class="level" id="level">평상</span>
+  <span class="grow"></span>
+  <span class="ind" id="indSrv"><i></i>SERVER</span>
+  <span class="ind" id="indBot"><i></i>ROBOT</span>
+  <span class="ind" id="indCam"><i></i>CAMERA</span>
+  <span class="sep"></span>
+  <span class="clock" id="clock">----.--.-- --:--:--</span>
+  <button class="btn danger" id="ackPill" onclick="ackAll()"></button>
+  <input class="field" id="ackName" placeholder="근무자" maxlength="20" title="이벤트 확인 시 기록되는 이름">
+  <button class="btn" id="notifyBtn">알림 켜기</button>
+</div>
+<div class="bar" id="critical"><span class="dot"></span><span class="msg" id="critMsg"></span><button class="btn" onclick="dismissCrit()">확인</button></div>
+<div class="bar" id="alarm"><span class="dot"></span><span class="msg">사람 감지 — 로봇이 대상을 확인·추적하고 있습니다</span></div>
 
-<main>
-  <div>
-    <section class="card">
-      <h2>로봇 카메라</h2>
-      <div id="streamBox">로봇이 연결되면 영상이 표시됩니다</div>
-      <div class="btns">
-        <button class="primary" onclick="cmd('patrol')">▶ 순찰 시작</button>
-        <button class="primary" onclick="cmd('follow')">👤 사람 따라가기</button>
-        <button onclick="cmd('register')">📸 특정인 등록</button>
-        <button onclick="cmd('reset_pos')">📍 위치 초기화</button>
-        <button class="danger" onclick="cmd('stop')">■ 정지</button>
-      </div>
-    </section>
+<div class="wrap">
+  <div class="stage">
+    <div class="viewer" id="viewer">
+      <div id="streamBox"></div>
+      <div class="nosig" id="nosig">NO SIGNAL</div>
+      <div class="cross"></div>
+      <div class="osd tl">CAM 01 · ROBOT<div class="sm" id="osdState">OFFLINE</div></div>
+      <div class="osd tr" id="osdTime">----.--.-- --:--:--</div>
+      <div class="osd rec" id="osdRec">REC 00:00</div>
+      <div class="osd bl" id="osdDist">DIST ---</div>
+      <div class="osd br" id="osdCam">PAN --- TILT ---</div>
+      <div class="tag-alarm">PERSON DETECTED</div>
+    </div>
 
-    <section class="card" style="margin-top:16px">
-      <h2>로봇 상태</h2>
-      <div class="stats">
-        <div class="stat"><span>모드</span><b id="sMode">-</b></div>
-        <div class="stat"><span>마지막 지점</span><b id="sNode">-</b></div>
-        <div class="stat"><span>출동 목표</span><b id="sTarget">-</b></div>
-        <div class="stat"><span>전방 거리</span><b id="sDist">-</b></div>
-      </div>
-      <div class="nodes" id="nodes"></div>
-    </section>
+    <div class="toolbar">
+      <button class="btn" id="recBtn" onclick="toggleRec()">녹화</button>
+      <button class="btn" onclick="capture()">캡처</button>
+      <button class="btn" onclick="fullscreen()">전체화면</button>
+      <span class="sep"></span>
+      <button class="btn primary" onclick="cmd('guard')">경비 시작</button>
+      <span class="grow"></span>
+      <button class="btn danger" onclick="cmd('stop')">정지</button>
+    </div>
+
+    <div class="info">
+      <div class="cell"><div class="cap">모드</div><div class="v" id="iMode">—</div></div>
+      <div class="cell"><div class="cap">단계</div><div class="v" id="iNav">—</div></div>
+      <div class="cell" id="cPerson"><div class="cap">사람</div><div class="v" id="iPerson">—</div></div>
+      <div class="cell"><div class="cap">바퀴</div><div class="v" id="iMove">—</div></div>
+      <div class="cell" id="cDist"><div class="cap">전방 거리</div><div class="v mono" id="iDist">—</div><div class="meter"><i id="mDist"></i></div></div>
+      <div class="cell"><div class="cap">카메라</div><div class="v mono" id="iCam">—</div></div>
+      <div class="cell" id="cHealth"><div class="cap">시스템</div><div class="v" id="iHealth">—</div></div>
+    </div>
+
+    <div class="phase" id="phase">
+      <div data-k="idle"><b>대기</b>정지</div>
+      <div data-k="roam"><b>수색</b>돌아다니며 탐색</div>
+      <div data-k="confirm"><b>확인</b>얼굴 확인·촬영</div>
+      <div data-k="follow"><b>추적</b>거리 유지</div>
+    </div>
   </div>
 
-  <section class="card">
-    <h2>이벤트 · 알림</h2>
-    <ul id="log"></ul>
-  </section>
-</main>
+  <aside class="side">
+    <div class="sec" style="border-bottom:0; padding-bottom:6px">
+      <div class="sec-h" style="margin-bottom:0"><span class="cap">이벤트</span>
+        <div class="tabs" id="tabs">
+          <button class="on" data-f="all">전체</button><button data-f="alert">경보</button><button data-f="photo">사진</button>
+        </div>
+      </div>
+    </div>
+    <div class="events" id="log"></div>
+  </aside>
+</div>
 <div id="toast"></div>
 
 <script>
-const MODE_KO = { idle:"대기", patrol:"순찰", dispatch:"출동", follow:"추종" };
-const NODE_IDS = ["A","B","C","D"];
-let robot = {}, nodes = {}, currentStream = null;
+const MODE_KO = { idle: "대기", guard: "경비" };
+const NAV_KO = { roam: "수색", confirm: "얼굴 확인", follow: "추적" };
+const MOVE_KO = { forward: "전진", back: "후진", left: "좌회전", right: "우회전", stop: "정지" };
+const PHOTO_KO = { face: "얼굴 확인 촬영", capture: "수동 캡처" };
+const PERSON_NOTIFY_GAP = 15000;   // 사람 감지 알림은 이 시간(ms) 안에 다시 띄우지 않음
+const HEALTH_KO = { camera_stale: "카메라 영상 멈춤", camera_blocked: "카메라 가림", stuck: "끼임·들림",
+                    moved: "외부 힘으로 이동", sensor: "센서 통신 이상", power: "전원 부족", heat: "과열" };
+const STEPS = ["idle", "roam", "confirm", "follow"];
+let robot = {}, currentStream = null, lastPerson = false, lastPersonNotify = 0, critShown = false, filter = "all";
+let audio = null, rec = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
-const fmtTime =ts => new Date(ts * 1000).toLocaleTimeString("ko-KR");
+const p2 = n => String(n).padStart(2, "0");
+const hms = d => `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+const ymd = d => `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}`;
+const fmtTime = ts => hms(new Date(ts * 1000));
+const stamp = () => { const d = new Date(); return `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`; };
+
+function tick() { const d = new Date(), t = `${ymd(d)} ${hms(d)}`; $("clock").textContent = t; $("osdTime").textContent = t; }
+setInterval(tick, 1000); tick();
 
 // ── 명령 ──
 async function cmd(c, extra = {}) {
   try {
-    const r = await fetch("/api/command", { method:"POST", headers:{"Content-Type":"application/json"},
-                                            body: JSON.stringify({ cmd:c, ...extra }) });
+    const r = await fetch("/api/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cmd: c, ...extra }) });
     if (!r.ok) toast((await r.json()).detail || "명령 실패", true);
   } catch { toast("서버에 연결할 수 없습니다", true); }
 }
 
-// ── 화면 갱신 ──
+// ── 위험 등급: 경보(기기 이상·사람 감지) > 경계(미확인 이벤트·경비 중) > 평상 ──
+function renderLevel() {
+  const unacked = document.querySelectorAll("#log .k-event:not(.acked)").length;
+  const health = robot.online && (robot.health || []).length;
+  const bad = critShown || health || (robot.online && robot.person);
+  const warn = unacked || (robot.online && robot.mode === "guard");
+  $("level").className = "level " + (bad ? "bad" : warn ? "warn" : "");
+  $("level").textContent = bad ? "경보" : warn ? "경계" : "평상";
+}
+function showCrit(msg) { $("critMsg").textContent = "기기 이상 — " + msg; $("critical").classList.add("show"); critShown = true; renderLevel(); }
+function dismissCrit() { $("critical").classList.remove("show"); critShown = false; renderLevel(); }
+
+// ── 로봇 상태 ──
+function setCell(id, state) { const el = $(id); el.classList.remove("ok", "warn", "bad"); if (state) el.classList.add(state); }
 function renderRobot() {
-  const on = robot.online;
-  $("robotPill").textContent = on ? "로봇 온라인" : "로봇 오프라인";
-  $("robotPill").className = "pill " + (on ? "ok" : "bad");
-  $("sMode").textContent = on ? (MODE_KO[robot.mode] || robot.mode || "-") : "-";
-  $("sNode").textContent = robot.node ?? "?";
-  $("sTarget").textContent = robot.target ?? "-";
-  $("sDist").textContent = robot.dist != null ? robot.dist + " cm" : "-";
+  const on = !!robot.online;
+  $("indBot").className = "ind " + (on ? "on" : "off");
+  $("indCam").className = "ind " + (on && robot.stream ? "on" : "off");
+  const mode = on ? (MODE_KO[robot.mode] || robot.mode || "—") : "—";
+  const nav = on && robot.nav ? (NAV_KO[robot.nav] || robot.nav) : "";
+  $("iMode").textContent = mode; $("iNav").textContent = nav || "—";
+  $("osdState").textContent = on ? (nav ? `${mode} / ${nav}` : mode) : "OFFLINE";
+
+  const person = on && !!robot.person;
+  $("iPerson").textContent = on ? (person ? "감지" : "없음") : "—"; setCell("cPerson", person ? "bad" : "");
+  $("iMove").textContent = on ? (MOVE_KO[robot.move] || "—") : "—";
+
+  const d = on ? robot.dist : null;
+  $("iDist").textContent = d != null ? `${d} cm` : "—";
+  $("osdDist").textContent = d != null ? `DIST ${String(d).padStart(3, "0")} cm` : "DIST ---";
+  $("mDist").style.width = d != null ? Math.max(3, 100 - Math.min(d, 200) / 2) + "%" : "0%";   // 가까울수록 길게
+  $("mDist").style.background = d == null ? "var(--mute)" : d < 30 ? "var(--bad)" : d < 70 ? "var(--warn)" : "var(--sub)";
+  setCell("cDist", d != null && d < 30 ? "bad" : d != null && d < 70 ? "warn" : "");
+
+  const hasCam = on && robot.pan != null;
+  $("iCam").textContent = hasCam ? `${robot.pan}° / ${robot.tilt}°` : "—";
+  $("osdCam").textContent = hasCam ? `PAN ${String(robot.pan).padStart(3, "0")} TILT ${String(robot.tilt).padStart(3, "0")}` : "PAN --- TILT ---";
+
+  const issues = on ? (robot.health || []) : [];
+  $("iHealth").textContent = !on ? "연결 없음" : issues.length ? issues.map(k => HEALTH_KO[k] || k).join(", ") : "정상";
+  setCell("cHealth", !on || issues.length ? "bad" : "ok");
+
+  // 작동 단계
+  const cur = !on ? null : robot.mode === "guard" ? (STEPS.includes(robot.nav) ? robot.nav : "roam") : "idle";
+  document.querySelectorAll("#phase div").forEach(el => el.classList.toggle("on", el.dataset.k === cur));
+
+  // 사람 감지 경보
+  document.body.classList.toggle("person", person);
+  $("alarm").classList.toggle("show", person);
+  if (person && !lastPerson && Date.now() - lastPersonNotify > PERSON_NOTIFY_GAP) {   // 새로 감지될 때만 한 번
+    lastPersonNotify = Date.now(); notify("사람 감지", "로봇이 대상을 확인·추적 중");
+  }
+  lastPerson = person;
+  renderLevel();
 
   if (robot.stream !== currentStream) {
     currentStream = robot.stream;
-    $("streamBox").innerHTML = currentStream
-      ? `<img src="${currentStream}" alt="로봇 카메라" onerror="this.parentNode.textContent='영상 연결 실패 (${currentStream})'">`
-      : "로봇이 연결되면 영상이 표시됩니다";
+    const box = $("streamBox"); box.innerHTML = "";
+    if (currentStream) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";            // 녹화(캔버스)에 쓰려면 필요 — 로봇 스트림은 CORS 허용
+      img.id = "streamImg"; img.alt = "로봇 카메라";
+      img.onload = () => { $("nosig").style.display = "none"; };
+      img.onerror = () => { $("nosig").style.display = ""; $("nosig").textContent = "VIDEO LOST"; };
+      img.src = currentStream;
+      box.appendChild(img);
+    } else {
+      $("nosig").style.display = ""; $("nosig").textContent = "NO SIGNAL";
+      if (rec) stopRec();
+    }
   }
-  renderNodes();
 }
 
-function renderNodes() {
-  $("nodes").innerHTML = NODE_IDS.map(id => {
-    const n = nodes[id] || {};
-    const cls = ["node", robot.node === id ? "here" : "", robot.target === id ? "target" : ""].join(" ");
-    const last = n.last_event ? `최근 이벤트 ${fmtTime(n.last_event.ts)}` : "";
-    return `<div class="${cls}">
-      <div class="id">${id}</div>
-      <div class="st ${n.online ? "on" : ""}">${n.online ? "● 노드 온라인" : "○ 노드 오프라인"}</div>
-      <div class="st">${last}</div>
-      <button onclick="cmd('dispatch',{node:'${id}'})">이 지점으로 출동</button>
-    </div>`;
-  }).join("");
+// ── 녹화: 브라우저에서 바로 .webm 으로 저장 (카메라 이름·시각을 영상에 새김) ──
+function toggleRec() { rec ? stopRec() : startRec(); }
+function startRec() {
+  const img = $("streamImg");
+  if (!img || !img.naturalWidth) return toast("녹화할 영상이 없습니다", true);
+  if (!window.MediaRecorder) return toast("이 브라우저는 녹화를 지원하지 않습니다", true);
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const ctx = c.getContext("2d");
+  const draw = () => {
+    try { ctx.drawImage(img, 0, 0, c.width, c.height); } catch {}
+    const d = new Date(), t = `${ymd(d)} ${hms(d)}`, y = Math.round(c.height / 18);
+    ctx.font = `${Math.round(c.height / 28)}px Consolas, monospace`;
+    ctx.fillStyle = "#fff"; ctx.shadowColor = "#000"; ctx.shadowBlur = 3;
+    ctx.fillText("CAM 01 · ROBOT", 16, y);
+    ctx.fillText(t, c.width - ctx.measureText(t).width - 16, y);
+    ctx.shadowBlur = 0;
+  };
+  draw();
+  let stream;
+  try { stream = c.captureStream(15); } catch { return toast("영상 보안 설정 때문에 녹화할 수 없습니다", true); }
+  const type = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(t => MediaRecorder.isTypeSupported(t));
+  let mr;
+  try { mr = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 4e6 } : {}); mr.start(1000); }
+  catch (e) { return toast("녹화를 시작할 수 없습니다: " + e.message, true); }
+  const chunks = [], name = `T7_CAM01_${stamp()}.webm`, t0 = Date.now();
+  mr.ondataavailable = e => e.data.size && chunks.push(e.data);
+  mr.onstop = () => {
+    const blob = new Blob(chunks, { type: "video/webm" });
+    download(URL.createObjectURL(blob), name);
+    toast(`녹화 저장: ${name} (${Math.round(blob.size / 1024)} KB)`);
+  };
+  const timer = setInterval(() => {
+    draw();
+    const s = Math.floor((Date.now() - t0) / 1000), t = `${p2(Math.floor(s / 60))}:${p2(s % 60)}`;
+    $("osdRec").textContent = `REC ${t}`; $("recBtn").textContent = `녹화 중지 ${t}`;
+  }, 1000 / 15);
+  rec = { mr, timer };
+  $("osdRec").classList.add("show"); $("recBtn").classList.add("rec-on"); $("recBtn").textContent = "녹화 중지 00:00";
+}
+function stopRec() {
+  if (!rec) return;
+  clearInterval(rec.timer);
+  if (rec.mr.state !== "inactive") rec.mr.stop();
+  rec = null;
+  $("osdRec").classList.remove("show"); $("recBtn").classList.remove("rec-on"); $("recBtn").textContent = "녹화";
 }
 
-function logItem(e) {
-  const li = document.createElement("li");
+// ── 캡처: 서버가 로봇 원본 사진(1280x720)을 받아 기록에 남기고, 내 컴퓨터로도 저장 ──
+async function capture() {
+  try {
+    const r = await fetch("/api/capture", { method: "POST" });
+    const j = await r.json();
+    if (!r.ok) return toast(j.detail || "캡처 실패", true);
+    download(j.image, `T7_CAM01_${stamp()}.jpg`);
+  } catch { toast("서버에 연결할 수 없습니다", true); }
+}
+function download(href, name) { const a = document.createElement("a"); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+function fullscreen() { if (document.fullscreenElement) document.exitFullscreen(); else $("viewer").requestFullscreen?.(); }
+
+// ── 이벤트 확인 ──
+function renderAck(el, e) {
+  el.classList.toggle("acked", !!e.ack);
+  el.querySelector(".ackrow").innerHTML = e.ack
+    ? `<span class="done">확인 ${fmtTime(e.ack.ts)}</span><span>${esc(e.ack.by)}</span>`
+    : `<button class="btn" onclick="ack(${e.id})">확인</button><span>미확인</span>`;
+}
+function updateUnacked() {
+  const n = document.querySelectorAll("#log .k-event:not(.acked)").length;
+  $("ackPill").style.display = n ? "inline-block" : "none";
+  $("ackPill").textContent = `미확인 ${n}건 모두 확인`;
+  document.title = (n ? `(${n}) ` : "") + "T7 Security";
+  applyFilter(); renderLevel();
+  return n;
+}
+const ackBy = () => $("ackName").value.trim() || "관리자";
+async function postAck(body) {
+  try {
+    const r = await fetch("/api/ack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, by: ackBy() }) });
+    if (!r.ok) toast((await r.json()).detail || "확인 처리 실패", true);
+  } catch { toast("서버에 연결할 수 없습니다", true); }
+}
+const ack = id => postAck({ id });
+const ackAll = () => postAck({ all: true });
+function applyAcks(acks) {
+  acks.forEach(({ id, ack }) => { const el = document.querySelector(`#log [data-id="${id}"]`); if (el) { el._event.ack = ack; renderAck(el, el._event); } });
+  updateUnacked();
+}
+try { $("ackName").value = localStorage.getItem("ackName") || ""; } catch {}
+$("ackName").oninput = () => { try { localStorage.setItem("ackName", $("ackName").value); } catch {} };
+
+// ── 이벤트 목록 ──
+function evItem(e) {
+  const el = document.createElement("div");
+  const thumb = img => img ? `<div class="thumb"><a href="${img}" target="_blank"><img src="${img}" loading="lazy" alt=""></a></div>` : "";
+  let kind, html;
   if (e.type === "event") {
-    li.className = "event";
-    const lv = e.level != null ? ` (소리 ${e.level})` : "";
-    li.innerHTML = `<time>${fmtTime(e.ts)}</time>🚨 <b>${e.node} 지점 이벤트</b> — ${esc(e.kind)}${lv}` +
-                   (e.image ? `<a href="${e.image}" target="_blank"><img src="${e.image}"></a>` : "");
+    kind = "event"; el.dataset.id = e.id; el._event = e;
+    html = `${thumb(e.image) || `<div class="thumb">SOUND</div>`}<div><div class="ttl">센서 ${esc(e.node)} 이벤트</div>
+      <div class="meta">${fmtTime(e.ts)} · ${esc(e.kind)}${e.level != null ? " · " + e.level : ""}</div><div class="ackrow"></div></div>`;
+  } else if (e.type === "photo") {
+    kind = "photo";
+    html = `${thumb(e.image)}<div><div class="ttl">${PHOTO_KO[e.reason] || "로봇 사진"}</div>
+      <div class="meta">${fmtTime(e.ts)}</div></div>`;
   } else {
-    li.className = e.level === "warn" ? "warn" : "";
-    li.innerHTML = `<time>${fmtTime(e.ts)}</time>${e.level === "warn" ? "⚠️ " : ""}`;
-    li.append(e.msg);
+    kind = e.level === "critical" ? "crit" : e.level === "warn" ? "warn" : "info";
+    html = `<div class="thumb">${{ crit: "CRITICAL", warn: "WARN", info: "INFO" }[kind]}</div><div>
+      <div class="ttl">${{ crit: "기기 이상", warn: "주의", info: "정보" }[kind]}</div>
+      <div class="meta">${fmtTime(e.ts)}</div><div class="msg">${esc(e.msg)}</div></div>`;
   }
-  return li;
+  el.className = `ev k-${kind}`;
+  el.dataset.f = kind === "photo" ? "photo" : kind === "info" ? "info" : "alert";
+  el.innerHTML = html;
+  if (e.type === "event") renderAck(el, e);
+  return el;
 }
-
 function pushLog(e) {
-  $("log").prepend(logItem(e));
-  while ($("log").children.length > 100) $("log").lastChild.remove();
+  $("log").prepend(evItem(e));
+  while ($("log").querySelectorAll(".ev").length > 150) $("log").querySelector(".ev:last-of-type").remove();
+  updateUnacked();
 }
+function applyFilter() {
+  let shown = 0;
+  $("log").querySelectorAll(".ev").forEach(el => {
+    const ok = filter === "all" || el.dataset.f === filter; el.style.display = ok ? "" : "none"; if (ok) shown++;
+  });
+  let em = $("emptyLog");
+  if (!shown && !em) { em = document.createElement("div"); em.id = "emptyLog"; em.className = "empty"; em.textContent = "기록이 없습니다"; $("log").appendChild(em); }
+  if (shown && em) em.remove();
+}
+$("tabs").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  filter = b.dataset.f; [...$("tabs").children].forEach(x => x.classList.toggle("on", x === b)); applyFilter();
+};
 
-// ── 알림 (브라우저 알림 + 소리 + 토스트) ──
+// ── 알림 ──
 function toast(text, bad = false) {
-  const t = $("toast");
-  t.textContent = text;
-  t.style.background = bad ? "var(--bad)" : "var(--warn)";
-  t.style.display = "block";
-  clearTimeout(t._h);
-  t._h = setTimeout(() => t.style.display = "none", 4000);
+  const t = $("toast"); t.textContent = text; t.className = bad ? "bad" : ""; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 4000);
 }
-
-let audio;
 function beep() {
   try {
     audio = audio || new AudioContext();
-    [0, 0.25].forEach(d => {
+    [0, 0.22].forEach(d => {
       const o = audio.createOscillator(), g = audio.createGain();
-      o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
-      g.gain.setValueAtTime(0.2, audio.currentTime + d);
-      o.start(audio.currentTime + d); o.stop(audio.currentTime + d + 0.15);
+      o.type = "square"; o.frequency.value = 1050; o.connect(g); g.connect(audio.destination);
+      g.gain.setValueAtTime(0.06, audio.currentTime + d);
+      o.start(audio.currentTime + d); o.stop(audio.currentTime + d + 0.12);
     });
   } catch {}
 }
-
-function notify(title, body, image) {
-  toast(`${title} — ${body}`, true);
-  beep();
-  if ("Notification" in window && Notification.permission === "granted")
-    new Notification(title, { body, icon: image || undefined });
+function notify(title, body) {
+  toast(`${title} — ${body}`, true); beep();
+  if ("Notification" in window && Notification.permission === "granted") new Notification("T7 Security · " + title, { body });
 }
-
 $("notifyBtn").onclick = async () => {
   if ("Notification" in window) await Notification.requestPermission();
-  audio = audio || new AudioContext();   // 사용자 클릭 이후에만 소리 재생 가능
-  $("notifyBtn").textContent = Notification.permission === "granted" ? "🔔 알림 켜짐" : "🔔 소리만 켜짐";
+  audio = audio || new AudioContext();   // 브라우저는 사용자가 누른 뒤에만 소리를 허용
+  $("notifyBtn").textContent = Notification.permission === "granted" ? "알림 켜짐" : "소리만 켜짐";
 };
 
 // ── WebSocket ──
 function connect() {
   const ws = new WebSocket(`ws://${location.host}/ws/web`);
-  ws.onopen = () => { $("srvPill").textContent = "서버 연결됨"; $("srvPill").className = "pill ok"; };
-  ws.onclose = () => {
-    $("srvPill").textContent = "서버 끊김 — 재연결 중"; $("srvPill").className = "pill bad";
-    setTimeout(connect, 2000);
-  };
+  ws.onopen = () => { $("indSrv").className = "ind on"; };
+  ws.onclose = () => { $("indSrv").className = "ind off"; setTimeout(connect, 2000); };
   ws.onmessage = ({ data }) => {
     const m = JSON.parse(data);
     if (m.type === "init") {
-      robot = m.robot; nodes = m.nodes;
-      $("log").innerHTML = "";
-      m.log.slice().reverse().forEach(pushLog);
-      renderRobot();
-    } else if (m.type === "robot") {
-      robot = m; renderRobot();
-    } else if (m.type === "nodes") {
-      nodes = m.nodes; renderNodes();
-    } else if (m.type === "event") {
+      robot = m.robot; $("log").innerHTML = "";
+      m.log.slice().reverse().forEach(pushLog); renderRobot();
+      // 페이지를 열기 직전(1분 안)에 기기 이상이 있었으면 배너로 보여줌
+      const crit = m.log.find(e => e.type === "alert" && e.level === "critical" && Date.now() / 1000 - e.ts < 60);
+      if (crit) showCrit(crit.msg);
+    } else if (m.type === "robot") { robot = m; renderRobot(); }
+    else if (m.type === "event") { pushLog(m); notify(`센서 ${m.node} 이벤트`, m.kind === "sound" ? "큰 소리 감지" : m.kind); }
+    else if (m.type === "photo") { pushLog(m); if (m.reason === "capture") toast("캡처 저장됨"); }   // 얼굴 사진은 목록에만 (알림 반복 방지)
+    else if (m.type === "alert") {
       pushLog(m);
-      notify(`🚨 ${m.node} 지점 이벤트`, m.kind === "sound" ? "큰 소리 감지" : m.kind, m.image);
-    } else if (m.type === "alert") {
-      pushLog(m);
-      if (m.level === "warn") { toast(m.msg); beep(); }
+      if (m.level === "critical") { showCrit(m.msg); notify("기기 이상", m.msg); }
+      else if (m.level === "warn") { toast(m.msg); beep(); }
     }
+    else if (m.type === "ack") applyAcks(m.acks);
   };
 }
-connect();
-renderNodes();
+connect(); renderRobot(); updateUnacked();
 </script>
 </body>
 </html>
