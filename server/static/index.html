@@ -4,24 +4,228 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>순찰로봇 관제</title>
+<style>
+  :root { --bg:#0f1218; --card:#181c24; --line:#2a303c; --fg:#e6e9ef; --dim:#8b93a3;
+          --ok:#3fb950; --warn:#f0883e; --bad:#f85149; --accent:#58a6ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui, "Malgun Gothic", sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  .pill { font-size:12px; padding:3px 10px; border-radius:99px; background:var(--line); color:var(--dim); }
+  .pill.ok { background:#1d3b25; color:var(--ok); }
+  .pill.bad { background:#3d1d1d; color:var(--bad); }
+  main { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:16px; padding:16px 20px; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card h2 { font-size:14px; margin:0 0 10px; color:var(--dim); font-weight:600; }
+  #streamBox { aspect-ratio:4/3; background:#000; border-radius:8px; display:grid; place-items:center; overflow:hidden; color:var(--dim); }
+  #streamBox img { width:100%; height:100%; object-fit:contain; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  button { font:inherit; font-size:14px; padding:9px 14px; border-radius:8px; border:1px solid var(--line);
+           background:#222836; color:var(--fg); cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:#1f3a5f; border-color:#2f5d94; }
+  button.danger { background:#4a1f1f; border-color:#7a2f2f; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .stat { background:#11151c; border-radius:8px; padding:8px 10px; }
+  .stat b { display:block; font-size:18px; margin-top:2px; }
+  .stat span { font-size:12px; color:var(--dim); }
+  .nodes { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+  .node { background:#11151c; border:2px solid transparent; border-radius:8px; padding:8px; text-align:center; }
+  .node.here { border-color:var(--accent); }
+  .node.target { border-color:var(--warn); }
+  .node .id { font-size:22px; font-weight:700; }
+  .node .st { font-size:11px; color:var(--dim); }
+  .node .st.on { color:var(--ok); }
+  .node button { margin-top:6px; padding:5px 8px; font-size:12px; width:100%; }
+  #log { list-style:none; margin:0; padding:0; max-height:70vh; overflow:auto; }
+  #log li { border-bottom:1px solid var(--line); padding:8px 2px; font-size:14px; }
+  #log li.event { border-left:3px solid var(--bad); padding-left:8px; }
+  #log li.warn { border-left:3px solid var(--warn); padding-left:8px; }
+  #log time { color:var(--dim); font-size:12px; margin-right:6px; }
+  #log img { display:block; width:100%; max-width:320px; margin-top:6px; border-radius:6px; cursor:zoom-in; }
+  #toast { position:fixed; right:20px; bottom:20px; background:var(--bad); color:#fff; padding:12px 16px;
+           border-radius:8px; font-weight:600; display:none; box-shadow:0 4px 20px #0008; }
+</style>
 </head>
 <body>
-  <h1>Team 7 순찰로봇 관제</h1>
+<header>
+  <h1>🚓 Team 7 순찰로봇 관제</h1>
+  <span id="srvPill" class="pill">서버 연결 중…</span>
+  <span id="robotPill" class="pill">로봇 오프라인</span>
+  <button id="notifyBtn" style="padding:5px 10px;font-size:12px">🔔 알림 켜기</button>
+</header>
 
-  <!-- TODO: 로봇 카메라 영상 (http://로봇IP:8080/stream) -->
-  <section id="stream"></section>
+<main>
+  <div>
+    <section class="card">
+      <h2>로봇 카메라</h2>
+      <div id="streamBox">로봇이 연결되면 영상이 표시됩니다</div>
+      <div class="btns">
+        <button class="primary" onclick="cmd('patrol')">▶ 순찰 시작</button>
+        <button class="primary" onclick="cmd('follow')">👤 사람 따라가기</button>
+        <button onclick="cmd('register')">📸 특정인 등록</button>
+        <button onclick="cmd('reset_pos')">📍 위치 초기화</button>
+        <button class="danger" onclick="cmd('stop')">■ 정지</button>
+      </div>
+    </section>
 
-  <!-- TODO: 순찰 시작 / 사람 따라가기 / 특정인 등록 / 정지 버튼 -->
-  <section id="controls"></section>
+    <section class="card" style="margin-top:16px">
+      <h2>로봇 상태</h2>
+      <div class="stats">
+        <div class="stat"><span>모드</span><b id="sMode">-</b></div>
+        <div class="stat"><span>마지막 지점</span><b id="sNode">-</b></div>
+        <div class="stat"><span>출동 목표</span><b id="sTarget">-</b></div>
+        <div class="stat"><span>전방 거리</span><b id="sDist">-</b></div>
+      </div>
+      <div class="nodes" id="nodes"></div>
+    </section>
+  </div>
 
-  <!-- TODO: 로봇 상태 (모드, 현재 지점, 출동 목표) + A~D 지점 -->
-  <section id="status"></section>
-
-  <!-- TODO: 이벤트·알림 목록 (사진 포함) -->
-  <section id="log"></section>
+  <section class="card">
+    <h2>이벤트 · 알림</h2>
+    <ul id="log"></ul>
+  </section>
+</main>
+<div id="toast"></div>
 
 <script>
-// TODO: ws://<서버>/ws/web 연결해서 이벤트 받으면 화면 갱신 + 알림
+const MODE_KO = { idle:"대기", patrol:"순찰", dispatch:"출동", follow:"추종" };
+const NODE_IDS = ["A","B","C","D"];
+let robot = {}, nodes = {}, currentStream = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const fmtTime =ts => new Date(ts * 1000).toLocaleTimeString("ko-KR");
+
+// ── 명령 ──
+async function cmd(c, extra = {}) {
+  try {
+    const r = await fetch("/api/command", { method:"POST", headers:{"Content-Type":"application/json"},
+                                            body: JSON.stringify({ cmd:c, ...extra }) });
+    if (!r.ok) toast((await r.json()).detail || "명령 실패", true);
+  } catch { toast("서버에 연결할 수 없습니다", true); }
+}
+
+// ── 화면 갱신 ──
+function renderRobot() {
+  const on = robot.online;
+  $("robotPill").textContent = on ? "로봇 온라인" : "로봇 오프라인";
+  $("robotPill").className = "pill " + (on ? "ok" : "bad");
+  $("sMode").textContent = on ? (MODE_KO[robot.mode] || robot.mode || "-") : "-";
+  $("sNode").textContent = robot.node ?? "?";
+  $("sTarget").textContent = robot.target ?? "-";
+  $("sDist").textContent = robot.dist != null ? robot.dist + " cm" : "-";
+
+  if (robot.stream !== currentStream) {
+    currentStream = robot.stream;
+    $("streamBox").innerHTML = currentStream
+      ? `<img src="${currentStream}" alt="로봇 카메라" onerror="this.parentNode.textContent='영상 연결 실패 (${currentStream})'">`
+      : "로봇이 연결되면 영상이 표시됩니다";
+  }
+  renderNodes();
+}
+
+function renderNodes() {
+  $("nodes").innerHTML = NODE_IDS.map(id => {
+    const n = nodes[id] || {};
+    const cls = ["node", robot.node === id ? "here" : "", robot.target === id ? "target" : ""].join(" ");
+    const last = n.last_event ? `최근 이벤트 ${fmtTime(n.last_event.ts)}` : "";
+    return `<div class="${cls}">
+      <div class="id">${id}</div>
+      <div class="st ${n.online ? "on" : ""}">${n.online ? "● 노드 온라인" : "○ 노드 오프라인"}</div>
+      <div class="st">${last}</div>
+      <button onclick="cmd('dispatch',{node:'${id}'})">이 지점으로 출동</button>
+    </div>`;
+  }).join("");
+}
+
+function logItem(e) {
+  const li = document.createElement("li");
+  if (e.type === "event") {
+    li.className = "event";
+    const lv = e.level != null ? ` (소리 ${e.level})` : "";
+    li.innerHTML = `<time>${fmtTime(e.ts)}</time>🚨 <b>${e.node} 지점 이벤트</b> — ${esc(e.kind)}${lv}` +
+                   (e.image ? `<a href="${e.image}" target="_blank"><img src="${e.image}"></a>` : "");
+  } else {
+    li.className = e.level === "warn" ? "warn" : "";
+    li.innerHTML = `<time>${fmtTime(e.ts)}</time>${e.level === "warn" ? "⚠️ " : ""}`;
+    li.append(e.msg);
+  }
+  return li;
+}
+
+function pushLog(e) {
+  $("log").prepend(logItem(e));
+  while ($("log").children.length > 100) $("log").lastChild.remove();
+}
+
+// ── 알림 (브라우저 알림 + 소리 + 토스트) ──
+function toast(text, bad = false) {
+  const t = $("toast");
+  t.textContent = text;
+  t.style.background = bad ? "var(--bad)" : "var(--warn)";
+  t.style.display = "block";
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.style.display = "none", 4000);
+}
+
+let audio;
+function beep() {
+  try {
+    audio = audio || new AudioContext();
+    [0, 0.25].forEach(d => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+      g.gain.setValueAtTime(0.2, audio.currentTime + d);
+      o.start(audio.currentTime + d); o.stop(audio.currentTime + d + 0.15);
+    });
+  } catch {}
+}
+
+function notify(title, body, image) {
+  toast(`${title} — ${body}`, true);
+  beep();
+  if ("Notification" in window && Notification.permission === "granted")
+    new Notification(title, { body, icon: image || undefined });
+}
+
+$("notifyBtn").onclick = async () => {
+  if ("Notification" in window) await Notification.requestPermission();
+  audio = audio || new AudioContext();   // 사용자 클릭 이후에만 소리 재생 가능
+  $("notifyBtn").textContent = Notification.permission === "granted" ? "🔔 알림 켜짐" : "🔔 소리만 켜짐";
+};
+
+// ── WebSocket ──
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws/web`);
+  ws.onopen = () => { $("srvPill").textContent = "서버 연결됨"; $("srvPill").className = "pill ok"; };
+  ws.onclose = () => {
+    $("srvPill").textContent = "서버 끊김 — 재연결 중"; $("srvPill").className = "pill bad";
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = ({ data }) => {
+    const m = JSON.parse(data);
+    if (m.type === "init") {
+      robot = m.robot; nodes = m.nodes;
+      $("log").innerHTML = "";
+      m.log.slice().reverse().forEach(pushLog);
+      renderRobot();
+    } else if (m.type === "robot") {
+      robot = m; renderRobot();
+    } else if (m.type === "nodes") {
+      nodes = m.nodes; renderNodes();
+    } else if (m.type === "event") {
+      pushLog(m);
+      notify(`🚨 ${m.node} 지점 이벤트`, m.kind === "sound" ? "큰 소리 감지" : m.kind, m.image);
+    } else if (m.type === "alert") {
+      pushLog(m);
+      if (m.level === "warn") { toast(m.msg); beep(); }
+    }
+  };
+}
+connect();
+renderNodes();
 </script>
 </body>
 </html>
